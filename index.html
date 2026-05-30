@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portrait-Robot : Le Face-à-Face</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-color: #1e293b;
+            --accent-color: #38bdf8;
+            --text-color: #f8fafc;
+            
+            /* Variables du visage joueur */
+            --skin-color: #ffd1dc; 
+            --ear-color: #fba3b7;
+            --face-width: 160px;
+            --face-height: 210px;
+            --face-margin: 10%;
+            --ear-rotate: 0deg;
+            --ears-scale-x: 1; 
+            --ears-scale-y: 1; 
+            --eyes-size: 1;
+            --eyes-dist: 18px;
+            --eyes-color: #475569;
+            --hair-color: #2d1a10;
+            --hair-scale: 1;
+            --nose-scale-x: 1;
+            --nose-scale-y: 1;
+            --lips-scale-x: 1;
+            --lips-scale-y: 1;
+            
+            /* Sourcils variables */
+            --brows-top: 142px;
+            --brows-length: 1;
+            --brows-thickness: 3.5;
+
+            /* Variables du visage suspect */
+            --s-skin-color: #ffd1dc;
+            --s-ear-color: #fba3b7;
+            --s-face-width: 160px;
+            --s-face-height: 210px;
+            --s-face-margin: 10%;
+            --s-ear-rotate: 0deg;
+            --s-ears-scale-x: 1;
+            --s-ears-scale-y: 1;
+            --s-eyes-size: 1;
+            --s-eyes-dist: 18px;
+            --s-eyes-color: #475569;
+            --s-hair-color: #2d1a10;
+            --s-hair-scale: 1;
+            --s-nose-scale-x: 1;
+            --s-nose-scale-y: 1;
+            --s-lips-scale-x: 1;
+            --s-lips-scale-y: 1;
+            --s-brows-top: 142px;
+            --s-brows-length: 1;
+            --s-brows-thickness: 3.5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 1100px;
+            background: var(--panel-color);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-height: 95vh;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        h1 { color: var(--accent-color); font-size: 1.8rem; }
+        
+        #timer-display {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fbbf24;
+            margin-top: 6px;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 450px 1fr;
+            gap: 30px;
+            align-items: start;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+        }
+
+        .controls-panel { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 14px; 
+            max-height: 72vh;
+            overflow-y: auto; 
+            padding-right: 10px;
+        }
+
+        .controls-panel::-webkit-scrollbar { width: 8px; }
+        .controls-panel::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+        .controls-panel::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .controls-panel::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+        @media (max-width: 850px) {
+            #game-container { max-height: none; }
+            .main-layout { grid-template-columns: 1fr; overflow: visible; }
+            .controls-panel { max-height: none; overflow-y: visible; padding-right: 0; }
+        }
+
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #020617;
+            border-radius: 12px;
+            height: 440px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #334155;
+        }
+
+        .avatar-container {
+            width: 320px;
+            height: 400px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        /* STRUCTURE TÊTE ET VISAGE */
+        .head-assembly {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px; 
+            height: 240px;
+            z-index: 10;
+        }
+
+        .component {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .face-layer { 
+            top: 0px; 
+            width: var(--face-width); 
+            height: var(--face-height); 
+            z-index: 2; 
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: width 0.1s, height 0.1s; 
+        }
+        .face-svg { width: 100%; height: 100%; fill: var(--skin-color); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15)); transition: fill 0.2s; }
+        
+        .wrinkles { fill: none; stroke: rgba(0, 0, 0, 0.16); stroke-width: 1.8; stroke-linecap: round; display: none; }
+        .wrinkles.active { display: block; }
+
+        /* STRATÉGIE 2 : Les oreilles sont injectées directement dans le conteneur du visage */
+        .ear-container {
+            position: absolute;
+            top: 95px; 
+            width: 28px;
+            height: 52px;
+            z-index: -1; /* Placées juste derrière le fond du visage pour cacher proprement la jointure */
+        }
+        
+        /* Soudée au flanc gauche du visage. Pivot fixé sur son ancrage droit */
+        .ear-container.left {
+            left: var(--face-margin);
+            transform-origin: right center;
+            transform: translateX(-100%) rotate(var(--ear-rotate)) scale(var(--ears-scale-x), var(--ears-scale-y));
+        }
+        
+        /* Soudée au flanc droit du visage. Pivot fixé sur son ancrage gauche */
+        .ear-container.right {
+            right: var(--face-margin);
+            transform-origin: left center;
+            transform: translateX(100%) rotate(calc(var(--ear-rotate) * -1)) scale(var(--ears-scale-x), var(--ears-scale-y));
+        }
+        .ear-svg { width: 100%; height: 100%; transition: fill 0.2s; }
+        .ear-back { fill: var(--ear-color); }
+        .ear-lines { fill: none; stroke: rgba(0, 0, 0, 0.18); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Le Regard */
+        .eyes-layer { top: 165px; width: 100%; height: 25px; z-index: 20; position: absolute; display: block; left: 0; transform: none; }
+        .eye-box { width: 40px; height: 25px; position: absolute; top: 0; }
+        .eye-box.left { right: 50%; transform: scale(var(--eyes-size)) translateX(calc(-1 * var(--eyes-dist))); transform-origin: center center; }
+        .eye-box.right { left: 50%; transform: scale(var(--eyes-size)) translateX(var(--eyes-dist)); transform-origin: center center; }
+        .pupil-color { fill: var(--eyes-color); }
+
+        /* Les Sourcils */
+        .brows-layer { top: var(--brows-top); width: 100%; height: 15px; z-index: 22; position: absolute; left: 0; }
+        .brow-box { width: 42px; height: 15px; position: absolute; top: 0; }
+        .brow-box.left { right: 50%; transform: translateX(calc(-1 * var(--eyes-dist))) scale(var(--brows-length), 1); transform-origin: center center; }
+        .brow-box.right { left: 50%; transform: translateX(var(--eyes-dist)) scale(var(--brows-length), 1); transform-origin: center center; }
+        .brow-svg { width: 100%; height: 100%; fill: none; stroke: var(--hair-color); stroke-width: var(--brows-thickness); stroke-linecap: round; transition: stroke 0.2s; }
+        
+        /* Nez et Bouche */
+        .nose-layer { top: 190px; z-index: 21; transform: translateX(-50%) scale(var(--nose-scale-x), var(--nose-scale-y)); transition: transform 0.1s; }
+        .nose-svg { width: 35px; height: 45px; fill: none; }
+        
+        .lips-layer { top: 245px; z-index: 20; transform: translateX(-50%) scale(var(--lips-scale-x), var(--lips-scale-y)); transition: transform 0.1s; }
+        .lips-svg { width: 60px; height: 25px; fill: #e11d48; }
+        
+        /* Cheveux */
+        .hair-layer { top: 50px; width: 200px; height: 110px; z-index: 30; transform: translateX(-50%) scale(var(--hair-scale)); transform-origin: bottom center; transition: transform 0.1s; }
+        .hair-svg { width: 100%; height: 100%; fill: var(--hair-color); transition: fill 0.2s; }
+
+        /* STRUCTURE SUSPECT (ÉCRAN FINAL DE COMPARAISON) - STRATÉGIE 2 */
+        .s-head-assembly { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: 200px; height: 240px; z-index: 10; }
+        .s-face-layer { top: 0px; width: var(--s-face-width); height: var(--s-face-height); z-index: 2; position: absolute; left: 50%; transform: translateX(-50%); }
+        .s-face-svg { width: 100%; height: 100%; fill: var(--s-skin-color); }
+        
+        .s-ear-container { position: absolute; top: 95px; width: 28px; height: 52px; z-index: -1; }
+        .s-ear-container.left { left: var(--s-face-margin); transform-origin: right center; transform: translateX(-100%) rotate(var(--s-ear-rotate)) scale(var(--s-ears-scale-x), var(--s-ears-scale-y)); }
+        .s-ear-container.right { right: var(--s-face-margin); transform-origin: left center; transform: translateX(100%) rotate(calc(var(--s-ear-rotate) * -1)) scale(var(--s-ears-scale-x), var(--s-ears-scale-y)); }
+        
+        .s-eyes-layer { top: 165px; width: 100%; height: 25px; z-index: 20; position: absolute; left: 0; transform: none; }
+        .s-eye-box { width: 40px; height: 25px; position: absolute; top: 0; }
+        .s-eye-box.left { right: 50%; transform: scale(var(--s-eyes-size)) translateX(calc(-1 * var(--s-eyes-dist))); transform-origin: center center; }
+        .s-eye-box.right { left: 50%; transform: scale(var(--s-eyes-size)) translateX(var(--s-eyes-dist)); transform-origin: center center; }
+        .s-pupil-color { fill: var(--s-eyes-color); }
+
+        .s-brows-layer { top: var(--s-brows-top); width: 100%; height: 15px; z-index: 22; position: absolute; left: 0; }
+        .s-brow-box { width: 42px; height: 15px; position: absolute; top: 0; }
+        .s-brow-box.left { right: 50%; transform: translateX(calc(-1 * var(--s-eyes-dist))) scale(var(--s-brows-length), 1); transform-origin: center center; }
+        .s-brow-box.right { left: 50%; transform: translateX(var(--s-eyes-dist)) scale(var(--s-brows-length), 1); transform-origin: center center; }
+
+        .s-nose-layer { top: 190px; z-index: 21; transform: translateX(-50%) scale(var(--s-nose-scale-x), var(--s-nose-scale-y)); }
+        .s-lips-layer { top: 245px; z-index: 20; transform: translateX(-50%) scale(var(--s-lips-scale-x), var(--s-lips-scale-y)); }
+        .s-hair-layer { top: 50px; width: 200px; height: 110px; z-index: 30; transform: translateX(-50%) scale(var(--s-hair-scale)); transform-origin: bottom center; }
+
+        /* Cagoule de transition */
+        .hood { position: absolute; inset: 0; background: #090d16; z-index: 100; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.4s ease-in-out; }
+        .hood.active { opacity: 1; }
+        .hood-content { width: 220px; height: 300px; background: #1e293b; border-radius: 110px 110px 50px 50px; border: 4px solid #0f172a; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .hood-cutout { position: absolute; top: 85px; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: var(--bg-color); border-radius: 20px; box-shadow: inset 0 4px 8px rgba(0,0,0,0.6); }
+
+        /* Panneau de résultats */
+        .overlay-screen { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.96); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+        .comparison-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; margin-top: 15px; }
+        .comparison-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .comparison-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; color: #94a3b8; }
+        .mini-avatar { width: 100%; height: 410px; background: #020617; border-radius: 6px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+
+        .scaling-wrapper {
+            transform: scale(0.85);
+            transform-origin: center center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 320px;
+            height: 400px;
+        }
+
+        /* Formulaires & Sliders */
+        .control-group { background: #1e293b; border: 1px solid #334155; padding: 14px; border-radius: 8px; }
+        .control-group h3 { font-size: 0.9rem; margin-bottom: 10px; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .slider-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .slider-row label { font-size: 0.85rem; width: 100px; color: #cbd5e1; }
+        .slider-row input[type="range"] { flex: 1; accent-color: var(--accent-color); cursor: pointer; }
+        .selector-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .btn-select { flex: 1; min-width: 90px; background: #334155; border: none; color: #cbd5e1; padding: 8px; font-size: 0.8rem; border-radius: 4px; cursor: pointer; }
+        .btn-select.active { background: var(--accent-color); color: #0f172a; font-weight: bold; }
+
+        .btn-main { background: var(--accent-color); color: #0f172a; border: none; padding: 12px 28px; font-size: 1rem; font-weight: bold; border-radius: 9999px; cursor: pointer; transition: all 0.2s; }
+        .btn-main:hover { opacity: 0.9; transform: translateY(-1px); }
+        .hide { display: none !important; }
+        #result-score { font-size: 3rem; font-weight: 800; color: #4ade80; }
+    </style>
+<base target="_blank">
+</head>
+<body>
+
+<div id="game-container">
+    <header>
+        <h1>Identification Portrait-Robot</h1>
+        <div id="timer-display">Prêt pour l'analyse visuelle</div>
+    </header>
+
+    <!-- Écran des scores finaux -->
+    <div id="screen-result" class="overlay-screen hide">
+        <h2>Précision du Portrait</h2>
+        <div id="result-score">0%</div>
+        <p id="result-comment" style="color: #cbd5e1; font-size: 0.95rem;"></p>
+        
+        <div class="comparison-layout">
+            <div class="comparison-box">
+                <div class="comparison-title">Votre Rendu</div>
+                <div class="mini-avatar" id="final-player-view"></div>
+            </div>
+            <div class="comparison-box">
+                <div class="comparison-title">Le Vrai Suspect</div>
+                <div class="mini-avatar" id="final-target-view"></div>
+            </div>
+        </div>
+        <button class="btn-main" style="margin-top: 15px;" onclick="resetGame()">Nouvelle tentative</button>
+    </div>
+
+    <div class="main-layout" id="main-game-layout">
+        <div class="left-column">
+            <button class="btn-main" id="btn-submit" style="width: 100%; margin-bottom: 5px;" onclick="evaluatePortrait()">Soumettre le Portrait-Robot</button>
+
+            <div class="canvas-container" id="live-canvas">
+                <!-- Écran de démarrage interne -->
+                <div id="screen-start" class="overlay-screen">
+                    <h2>Le suspect va retirer sa cagoule...</h2>
+                    <p style="margin-top: 8px; color: #94a3b8; max-width: 320px; font-size:0.9rem;">
+                        Observez attentivement ses traits pendant 10 secondes avant qu'il ne se masque à nouveau.
+                    </p>
+                    <button class="btn-main" style="margin-top: 10px;" onclick="startGame()">Lancer l'observation</button>
+                </div>
+
+                <div class="avatar-container" id="avatar-live-holder">
+                    <!-- ENSEMBLE DE LA TÊTE (CONTRÔLÉ DYNAMIQUEMENT) -->
+                    <div class="head-assembly">
+                        <div class="face-layer">
+                            <svg class="face-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <path id="face-path" d="M10,30 C10,5 90,5 90,30 C90,65 75,100 50,100 C25,100 10,65 10,30 Z"/>
+                                <g id="face-wrinkles" class="wrinkles">
+                                    <path d="M25,15 Q50,11 75,15" />
+                                    <path d="M20,23 Q50,18 80,23" />
+                                    <path d="M22,48 Q28,50 32,47" />
+                                    <path d="M78,48 Q72,50 68,47" />
+                                    <path d="M38,55 C33,65 30,78 35,88" />
+                                    <path d="M62,55 C67,65 70,78 65,88" />
+                                </g>
+                            </svg>
+
+                            <!-- Oreilles intégrées à l'intérieur de la boîte faciale pour suivre sa largeur à 100% -->
+                            <div class="ear-container left">
+                                <svg class="ear-svg" viewBox="0 0 30 55">
+                                    <path class="ear-back" d="M30,52 C16,52 6,42 4,28 C2,16 10,4 24,2 C27,1.5 29,3 29,6 L26,22 C25,27 28,32 29,38 Z" />
+                                    <path class="ear-lines" d="M22,8 C14,10 10,18 12,26 C13,30 18,34 22,32" />
+                                </svg>
+                            </div>
+                            <div class="ear-container right">
+                                <svg class="ear-svg" viewBox="0 0 30 55">
+                                    <path class="ear-back" d="M0,52 C14,52 24,42 26,28 C28,16 20,4 6,2 C3,1.5 1,3 1,6 L4,22 C5,27 2,32 1,38 Z" />
+                                    <path class="ear-lines" d="M8,8 C16,10 20,18 18,26 C17,30 12,34 8,32" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Autres éléments du visage -->
+                    <div class="component hair-layer">
+                        <svg class="hair-svg" viewBox="0 0 200 110" id="hair-svg-port"></svg>
+                    </div>
+
+                    <div class="brows-layer">
+                        <div id="brow-l-box" class="brow-box left">
+                            <svg viewBox="0 0 42 15" width="100%" height="100%">
+                                <path id="brow-l-path" class="brow-svg" d="M5,11 Q20,3 37,10" />
+                            </svg>
+                        </div>
+                        <div id="brow-r-box" class="brow-box right">
+                            <svg viewBox="0 0 42 15" width="100%" height="100%">
+                                <path id="brow-r-path" class="brow-svg" d="M37,11 Q22,3 5,10" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="component eyes-layer">
+                        <div id="eye-l-box" class="eye-box left">
+                            <svg viewBox="0 0 40 25" width="100%" height="100%">
+                                <path id="eye-l-contour" d="M5,12 C10,4 30,4 35,12 C30,20 10,20 5,12 Z" fill="#ffffff" stroke="#334155"/>
+                                <circle cx="20" cy="12" r="7" class="pupil-color"/>
+                                <circle cx="20" cy="12" r="3" fill="#000000"/>
+                                <circle cx="22" cy="10" r="1" fill="#ffffff"/>
+                            </svg>
+                        </div>
+                        <div id="eye-r-box" class="eye-box right">
+                            <svg viewBox="0 0 40 25" width="100%" height="100%">
+                                <path id="eye-r-contour" d="M5,12 C10,4 30,4 35,12 C30,20 10,20 5,12 Z" fill="#ffffff" stroke="#334155"/>
+                                <circle cx="20" cy="12" r="7" class="pupil-color"/>
+                                <circle cx="20" cy="12" r="3" fill="#000000"/>
+                                <circle cx="22" cy="10" r="1" fill="#ffffff"/>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="component nose-layer">
+                        <svg class="nose-svg" viewBox="0 0 40 50" id="nose-svg-port"></svg>
+                    </div>
+                    <div class="component lips-layer">
+                        <svg class="lips-svg" viewBox="0 0 60 25" id="lips-svg-port"></svg>
+                    </div>
+
+                    <!-- Cache de la cagoule animée -->
+                    <div id="cagoule-overlay" class="hood">
+                        <div class="hood-content"><div class="hood-cutout"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panneau latéral de modification -->
+        <div class="controls-panel" id="controls-panel">
+            <div class="control-group">
+                <h3>Teint & Aspect de la Peau</h3>
+                <div class="selector-row">
+                    <button class="btn-select active" id="s-tone-1" onclick="changeType('skinTone', 1)">Blanc</button>
+                    <button class="btn-select" id="s-tone-2" onclick="changeType('skinTone', 2)">Métisse</button>
+                    <button class="btn-select" id="s-tone-3" onclick="changeType('skinTone', 3)">Jaune</button>
+                    <button class="btn-select" id="s-tone-4" onclick="changeType('skinTone', 4)">Cuivré</button>
+                    <button class="btn-select" id="s-tone-5" onclick="changeType('skinTone', 5)">Noir</button>
+                </div>
+                <div class="selector-row" style="margin-top: 8px;">
+                    <button class="btn-select active" id="f-age-1" onclick="changeType('faceAge', 1)">Jeune / Lisse</button>
+                    <button class="btn-select" id="f-age-2" onclick="changeType('faceAge', 2)">Âgé / Ridé</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Morphologie Visage</h3>
+                <div class="slider-row">
+                    <label>Largeur tête</label>
+                    <input type="range" id="p-faceW" min="130" max="190" value="160" oninput="ajustEyesRange(); renderAvatar();">
+                </div>
+                <div class="slider-row">
+                    <label>Longueur tête</label>
+                    <input type="range" id="p-faceH" min="180" max="240" value="210" oninput="renderAvatar()">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="f-shape-1" onclick="changeType('faceShape', 1)">Menton Fin</button>
+                    <button class="btn-select" id="f-shape-2" onclick="changeType('faceShape', 2)">Mâchoire Carrée</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Les Oreilles</h3>
+                <div class="slider-row">
+                    <label>Décollement</label>
+                    <input type="range" id="p-earsSize" min="60" max="150" value="100" oninput="renderAvatar()">
+                </div>
+                <div class="slider-row">
+                    <label>Hauteur</label>
+                    <input type="range" id="p-earsTop" min="60" max="150" value="100" oninput="renderAvatar()">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Les Sourcils</h3>
+                <div class="slider-row">
+                    <label>Hauteur jauge</label>
+                    <input type="range" id="p-browsTop" min="125" max="152" value="142" oninput="renderAvatar()">
+                </div>
+                <div class="slider-row">
+                    <label>Longueur traits</label>
+                    <input type="range" id="p-browsLength" min="70" max="140" value="100" oninput="renderAvatar()">
+                </div>
+                <div class="slider-row">
+                    <label>Épaisseur</label>
+                    <input type="range" id="p-browsThickness" min="15" max="65" value="35" oninput="renderAvatar()">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="b-shape-1" onclick="changeType('browsShape', 1)">Arqués</button>
+                    <button class="btn-select" id="b-shape-2" onclick="changeType('browsShape', 2)">Droits</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Le Regard</h3>
+                <div class="slider-row">
+                    <label>Taille globes</label>
+                    <input type="range" id="p-eyesSize" min="75" max="135" value="105" oninput="ajustEyesRange(); renderAvatar();">
+                </div>
+                <div class="slider-row">
+                    <label>Écartement</label>
+                    <input type="range" id="p-eyesDist" min="0" max="45" value="18" oninput="ajustEyesRange(); renderAvatar();">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="e-color-1" onclick="changeType('eyeColor', 1)">Bleu</button>
+                    <button class="btn-select" id="e-color-2" onclick="changeType('eyeColor', 2)">Vert</button>
+                    <button class="btn-select" id="e-color-3" onclick="changeType('eyeColor', 3)">Marron</button>
+                </div>
+                <div class="selector-row" style="margin-top: 6px;">
+                    <button class="btn-select active" id="e-shape-1" onclick="changeType('eyeShape', 1)">Classique</button>
+                    <button class="btn-select" id="e-shape-2" onclick="changeType('eyeShape', 2)">Bridé / Fin</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Système Pilaire (Cheveux)</h3>
+                <div class="slider-row">
+                    <label>Épaisseur</label>
+                    <input type="range" id="p-hairS" min="80" max="135" value="105" oninput="renderAvatar()">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="h-color-1" onclick="changeType('hairColor', 1)">Noir</button>
+                    <button class="btn-select" id="h-color-2" onclick="changeType('hairColor', 2)">Brun</button>
+                    <button class="btn-select" id="h-color-3" onclick="changeType('hairColor', 3)">Blond</button>
+                    <button class="btn-select" id="h-color-4" onclick="changeType('hairColor', 4)">Gris</button>
+                </div>
+                <div class="selector-row" style="margin-top: 6px;">
+                    <button class="btn-select active" id="h-style-1" onclick="changeType('hairStyle', 1)">Implantation Droite</button>
+                    <button class="btn-select" id="h-style-2" onclick="changeType('hairStyle', 2)">Brosse / Pointes</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Le Nez</h3>
+                <div class="slider-row">
+                    <label>Largeur ailes</label>
+                    <input type="range" id="p-noseX" min="75" max="135" value="105" oninput="renderAvatar()">
+                </div>
+                <div class="slider-row">
+                    <label>Allongement</label>
+                    <input type="range" id="p-noseY" min="75" max="135" value="105" oninput="renderAvatar()">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="n-shape-1" onclick="changeType('noseShape', 1)">Aquilin</button>
+                    <button class="btn-select" id="n-shape-2" onclick="changeType('noseShape', 2)">Narines Épatées</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>La Bouche</h3>
+                <div class="slider-row">
+                    <label>Étirement</label>
+                    <input type="range" id="p-lipsX" min="75" max="135" value="105" oninput="renderAvatar()">
+                </div>
+                <div class="slider-row">
+                    <label>Hauteur jauge</label>
+                    <input type="range" id="p-lipsY" min="75" max="135" value="105" oninput="renderAvatar()">
+                </div>
+                <div class="selector-row">
+                    <button class="btn-select active" id="l-shape-1" onclick="changeType('lipsShape', 1)">Souriante</button>
+                    <button class="btn-select" id="l-shape-2" onclick="changeType('lipsShape', 2)">Pincée</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let targetSpecs = {};
+    let playerShapes = { skinTone: 1, faceAge: 1, faceShape: 1, browsShape: 1, eyeColor: 1, eyeShape: 1, hairColor: 1, hairStyle: 1, noseShape: 1, lipsShape: 1 };
+
+    const PATHS = {
+        face: { 1: "M10,30 C10,5 90,5 90,30 C90,65 75,100 50,100 C25,100 10,65 10,30 Z", 2: "M15,25 C15,5 85,5 85,25 C85,60 85,95 50,95 C15,95 15,60 15,25 Z" },
+        hair: { 1: `<path d="M20,110 C20,40 50,10 100,10 C150,10 180,40 180,110 C160,100 140,100 100,105 C60,100 40,100 20,110 Z"/>`, 2: `<path d="M25,110 L30,80 L50,50 L80,55 L100,30 L120,55 L150,50 L170,80 L175,110 C140,95 60,95 25,110 Z"/>` },
+        brows: { 1: { l: "M5,11 Q20,3 37,10", r: "M37,11 Q22,3 5,10" }, 2: { l: "M5,7 L37,7", r: "M5,7 L37,7" } },
+        eye: { 1: "M5,12 C10,4 30,4 35,12 C30,20 10,20 5,12 Z", 2: "M4,14 C12,8 28,6 36,10 C32,16 16,18 4,14 Z" },
+        colors: { 1: "#2563eb", 2: "#16a34a", 3: "#78350f" },
+        hairColors: { 1: "#111827", 2: "#6b4423", 3: "#f59e0b", 4: "#94a3b8" },
+        skins: { 
+            1: { face: "#ffd1dc", ear: "#fba3b7" }, 2: { face: "#e8c39e", ear: "#ceaa85" }, 
+            3: { face: "#fbe49e", ear: "#dec57e" }, 4: { face: "#d45d43", ear: "#b2442d" }, 
+            5: { face: "#7c5030", ear: "#633e23" }
+        },
+        nose: { 1: `<path d="M20,5 L16,32 L10,40 L20,42 L30,40 L24,32 Z" stroke="rgba(0,0,0,0.2)" stroke-width="2" fill="none"/>`, 2: `<path d="M20,5 L18,30 C12,32 5,34 8,42 C13,46 27,46 32,42 C35,34 28,32 22,30 Z" stroke="rgba(0,0,0,0.2)" stroke-width="2" fill="none"/>` },
+        lips: { 1: `<path d="M5,10 C15,18 45,18 55,10 C45,13 15,13 5,10 Z" fill="#b91c1c"/><path d="M5,10 C15,5 45,5 55,10 C45,11 15,11 5,10 Z" fill="#e11d48"/>`, 2: `<path d="M8,12 C18,14 42,14 52,12 C42,12 18,12 8,12 Z" fill="#b91c1c"/><path d="M8,12 C18,7 42,7 52,12 C42,13 18,13 8,12 Z" fill="#e11d48"/>` }
+    };
+
+    const numericalSliders = [
+        { id: 'p-faceW', prop: 'faceW' }, { id: 'p-faceH', prop: 'faceH' },
+        { id: 'p-eyesSize', prop: 'eyesSize' }, { id: 'p-eyesDist', prop: 'eyesDist' },
+        { id: 'p-hairS', prop: 'hairS' }, { id: 'p-noseX', prop: 'noseX' },
+        { id: 'p-noseY', prop: 'noseY' }, { id: 'p-lipsX', prop: 'lipsX' },
+        { id: 'p-lipsY', prop: 'lipsY' }, { id: 'p-earsSize', prop: 'earsSize' },
+        { id: 'p-earsTop', prop: 'earsTop' },
+        { id: 'p-browsTop', prop: 'browsTop' }, { id: 'p-browsLength', prop: 'browsLength' },
+        { id: 'p-browsThickness', prop: 'browsThickness' }
+    ];
+
+    window.onload = function() { ajustEyesRange(); toggleControls(true); };
+
+    function ajustEyesRange() {
+        const currentFaceWidth = parseInt(document.getElementById('p-faceW').value);
+        const currentEyeScale = parseFloat(document.getElementById('p-eyesSize').value) / 100;
+        
+        const eyeRealWidth = 40 * currentEyeScale;
+        let maxSafeDist = Math.floor((currentFaceWidth / 2) - eyeRealWidth);
+        if (maxSafeDist < 0) maxSafeDist = 0;
+
+        const distSlider = document.getElementById('p-eyesDist');
+        distSlider.max = maxSafeDist;
+        if(parseInt(distSlider.value) > maxSafeDist) {
+            distSlider.value = maxSafeDist;
+        }
+    }
+
+    function generateSuspect() {
+        let specs = {
+            skinTone: Math.floor(Math.random() * 5) + 1,
+            faceAge: Math.floor(Math.random() * 2) + 1,
+            faceShape: Math.floor(Math.random() * 2) + 1,
+            browsShape: Math.floor(Math.random() * 2) + 1,
+            eyeColor: Math.floor(Math.random() * 3) + 1,
+            eyeShape: Math.floor(Math.random() * 2) + 1,
+            hairColor: Math.floor(Math.random() * 4) + 1,
+            hairStyle: Math.floor(Math.random() * 2) + 1,
+            noseShape: Math.floor(Math.random() * 2) + 1,
+            lipsShape: Math.floor(Math.random() * 2) + 1
+        };
+
+        const faceWEl = document.getElementById('p-faceW');
+        specs.faceW = Math.floor(Math.random() * (parseInt(faceWEl.max) - parseInt(faceWEl.min) + 1)) + parseInt(faceWEl.min);
+
+        const eyesSizeEl = document.getElementById('p-eyesSize');
+        specs.eyesSize = Math.floor(Math.random() * (parseInt(eyesSizeEl.max) - parseInt(eyesSizeEl.min) + 1)) + parseInt(eyesSizeEl.min);
+
+        numericalSliders.forEach(s => {
+            if (s.prop === 'faceW' || s.prop === 'eyesSize') return; 
+            let el = document.getElementById(s.id);
+            let min = parseInt(el.min);
+            let max = parseInt(el.max);
+            
+            if (s.id === 'p-eyesDist') {
+                const eyeRealWidth = 40 * (specs.eyesSize / 100);
+                max = Math.floor((specs.faceW / 2) - eyeRealWidth);
+                if (max < 0) max = 0;
+            }
+            specs[s.prop] = Math.floor(Math.random() * (max - min + 1)) + min;
+        });
+        return specs;
+    }
+
+    function changeType(category, value) {
+        playerShapes[category] = value;
+        const container = document.getElementById(getButtonId(category, value)).parentElement;
+        container.querySelectorAll('.btn-select').forEach(b => b.classList.remove('active'));
+        document.getElementById(getButtonId(category, value)).classList.add('active');
+        renderAvatar();
+    }
+
+    function getButtonId(cat, val) {
+        if(cat === 'skinTone') return `s-tone-${val}`;
+        if(cat === 'faceAge') return `f-age-${val}`;
+        if(cat === 'faceShape') return `f-shape-${val}`;
+        if(cat === 'browsShape') return `b-shape-${val}`;
+        if(cat === 'eyeColor') return `e-color-${val}`;
+        if(cat === 'eyeShape') return `e-shape-${val}`;
+        if(cat === 'hairColor') return `h-color-${val}`;
+        if(cat === 'hairStyle') return `h-style-${val}`;
+        if(cat === 'noseShape') return `n-shape-${val}`;
+        if(cat === 'lipsShape') return `l-shape-${val}`;
+    }
+
+    function renderAvatar() {
+        const root = document.documentElement;
+        
+        const activeSkin = PATHS.skins[playerShapes.skinTone];
+        root.style.setProperty('--skin-color', activeSkin.face);
+        root.style.setProperty('--ear-color', activeSkin.ear);
+
+        document.getElementById('face-path').setAttribute('d', PATHS.face[playerShapes.faceShape]);
+
+        // Forme 1 (ovale/pointue) : marge 22% pour oreilles très collées, inclinées 8deg
+        // Forme 2 (carrée) : marge 18% pour oreilles collées, droites 0deg
+        if (playerShapes.faceShape === 1) {
+            root.style.setProperty('--face-margin', '22%');
+            root.style.setProperty('--ear-rotate', '8deg');
+        } else {
+            root.style.setProperty('--face-margin', '18%');
+            root.style.setProperty('--ear-rotate', '0deg');
+        }
+        root.style.setProperty('--face-width', document.getElementById('p-faceW').value + 'px');
+        root.style.setProperty('--face-height', document.getElementById('p-faceH').value + 'px');
+        
+        const wrinkleGroup = document.getElementById('face-wrinkles');
+        if(playerShapes.faceAge === 2) wrinkleGroup.classList.add('active');
+        else wrinkleGroup.classList.remove('active');
+
+        // Application de la stratégie 2 pour les oreilles de l'avatar actif
+        root.style.setProperty('--ears-scale-x', document.getElementById('p-earsSize').value / 100);
+        root.style.setProperty('--ears-scale-y', document.getElementById('p-earsTop').value / 100);
+
+        // Sourcils
+        document.getElementById('brow-l-path').setAttribute('d', PATHS.brows[playerShapes.browsShape].l);
+        document.getElementById('brow-r-path').setAttribute('d', PATHS.brows[playerShapes.browsShape].r);
+        root.style.setProperty('--brows-top', document.getElementById('p-browsTop').value + 'px');
+        root.style.setProperty('--brows-length', document.getElementById('p-browsLength').value / 100);
+        root.style.setProperty('--brows-thickness', (document.getElementById('p-browsThickness').value / 10));
+
+        // Yeux
+        document.getElementById('eye-l-contour').setAttribute('d', PATHS.eye[playerShapes.eyeShape]);
+        document.getElementById('eye-r-contour').setAttribute('d', PATHS.eye[playerShapes.eyeShape]);
+        root.style.setProperty('--eyes-color', PATHS.colors[playerShapes.eyeColor]);
+        root.style.setProperty('--eyes-size', document.getElementById('p-eyesSize').value / 100);
+        root.style.setProperty('--eyes-dist', document.getElementById('p-eyesDist').value + 'px');
+
+        // Cheveux, Nez, Bouche
+        document.getElementById('hair-svg-port').innerHTML = PATHS.hair[playerShapes.hairStyle];
+        root.style.setProperty('--hair-color', PATHS.hairColors[playerShapes.hairColor]);
+        root.style.setProperty('--hair-scale', document.getElementById('p-hairS').value / 100);
+
+        document.getElementById('nose-svg-port').innerHTML = PATHS.nose[playerShapes.noseShape];
+        root.style.setProperty('--nose-scale-x', document.getElementById('p-noseX').value / 100);
+        root.style.setProperty('--nose-scale-y', document.getElementById('p-noseY').value / 100);
+
+        document.getElementById('lips-svg-port').innerHTML = PATHS.lips[playerShapes.lipsShape];
+        root.style.setProperty('--lips-scale-x', document.getElementById('p-lipsX').value / 100);
+        root.style.setProperty('--lips-scale-y', document.getElementById('p-lipsY').value / 100);
+    }
+
+    function applySpecs(specs) {
+        playerShapes = {
+            skinTone: specs.skinTone, faceAge: specs.faceAge, faceShape: specs.faceShape, browsShape: specs.browsShape,
+            eyeColor: specs.eyeColor, eyeShape: specs.eyeShape, hairColor: specs.hairColor,
+            hairStyle: specs.hairStyle, noseShape: specs.noseShape, lipsShape: specs.lipsShape
+        };
+
+        Object.keys(playerShapes).forEach(k => {
+            const btn = document.getElementById(getButtonId(k, playerShapes[k]));
+            if (btn) {
+                btn.parentElement.querySelectorAll('.btn-select').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+        });
+
+        numericalSliders.forEach(s => {
+            document.getElementById(s.id).value = specs[s.prop];
+        });
+        ajustEyesRange();
+        renderAvatar();
+    }
+
+    function startGame() {
+        ajustEyesRange();
+        document.getElementById('screen-start').classList.add('hide');
+        targetSpecs = generateSuspect();
+        applySpecs(targetSpecs);
+        
+        let sec = 10;
+        const timer = document.getElementById('timer-display');
+        timer.innerText = `Observation... Fenêtre ouverte : ${sec}s`;
+
+        const countdown = setInterval(() => {
+            sec--;
+            if(sec > 0) {
+                timer.innerText = `Observation... Fenêtre ouverte : ${sec}s`;
+            } else {
+                clearInterval(countdown);
+                timer.innerText = "Observé ! Le suspect remet sa cagoule...";
+                document.getElementById('cagoule-overlay').classList.add('active');
+                
+                setTimeout(() => {
+                    timer.innerText = "Restituez les traits exacts du visage.";
+                    clearToNeutral();
+                    document.getElementById('cagoule-overlay').classList.remove('active');
+                    toggleControls(false);
+                }, 1400);
+            }
+        }, 1000);
+    }
+
+    function clearToNeutral() {
+        numericalSliders.forEach(s => {
+            let el = document.getElementById(s.id);
+            el.value = Math.floor((parseInt(el.min) + parseInt(el.max)) / 2);
+        });
+        Object.keys(playerShapes).forEach(k => changeType(k, 1));
+        ajustEyesRange();
+        renderAvatar();
+    }
+
+    function toggleControls(status) {
+        numericalSliders.forEach(s => document.getElementById(s.id).disabled = status);
+        document.querySelectorAll('.btn-select').forEach(b => b.disabled = status);
+        document.getElementById('btn-submit').disabled = status;
+        document.getElementById('controls-panel').style.opacity = status ? "0.25" : "1";
+    }
+
+    function buildStaticAvatarHTML(prefix, specs, shapes) {
+        const fW = specs.faceW + 'px';
+        const fH = specs.faceH + 'px';
+
+        // Forme 1 (ovale/pointue) : marge 22%, oreilles inclinées (8deg)
+        // Forme 2 (carrée) : marge 18%, oreilles droites (0deg)
+        const fMargin = shapes.faceShape === 1 ? '22%' : '18%';
+        const earRotate = shapes.faceShape === 1 ? '8deg' : '0deg';
+        const eX = specs.earsSize / 100;
+        const eY = specs.earsTop / 100; 
+        const bTop = specs.browsTop + 'px';
+        const bLen = specs.browsLength / 100;
+        const bThick = specs.browsThickness / 10;
+        const eyS = specs.eyesSize / 100;
+        const eyD = specs.eyesDist + 'px';
+        const hS = specs.hairS / 100;
+        const nX = specs.noseX / 100;
+        const nY = specs.noseY / 100;
+        const lX = specs.lipsX / 100;
+        const lY = specs.lipsY / 100;
+        
+        const skinData = PATHS.skins[shapes.skinTone];
+        const ageClass = (shapes.faceAge === 2) ? "wrinkles active" : "wrinkles";
+
+        return `
+            <div class="scaling-wrapper">
+                <div class="avatar-container">
+                    <div class="s-head-assembly">
+                        <div class="s-face-layer" style="
+                            --s-face-width: ${fW}; --s-face-height: ${fH}; --s-face-margin: ${fMargin}; --s-ear-rotate: ${earRotate};
+                            --s-ears-scale-x: ${eX}; --s-ears-scale-y: ${eY};
+                            --s-skin-color: ${skinData.face}; --s-ear-color: ${skinData.ear};
+                        ">
+                            <svg class="face-svg" viewBox="0 0 100 100" preserveAspectRatio="none" style="fill: var(--s-skin-color)">
+                                <path d="${PATHS.face[shapes.faceShape]}"/>
+                                <g class="${ageClass}">
+                                    <path d="M25,15 Q50,11 75,15" />
+                                    <path d="M20,23 Q50,18 80,23" />
+                                    <path d="M22,48 Q28,50 32,47" />
+                                    <path d="M78,48 Q72,50 68,47" />
+                                    <path d="M38,55 C33,65 30,78 35,88" />
+                                    <path d="M62,55 C67,65 70,78 65,88" />
+                                </g>
+                            </svg>
+                            
+                            <!-- Stratégie 2 appliquée également au rendu statique de comparaison -->
+                            <div class="s-ear-container left">
+                                <svg class="ear-svg" viewBox="0 0 30 55">
+                                    <path d="M30,52 C16,52 6,42 4,28 C2,16 10,4 24,2 C27,1.5 29,3 29,6 L26,22 C25,27 28,32 29,38 Z" style="fill: var(--s-ear-color)"/>
+                                    <path class="ear-lines" d="M22,8 C14,10 10,18 12,26 C13,30 18,34 22,32" />
+                                </svg>
+                            </div>
+                            <div class="s-ear-container right">
+                                <svg class="ear-svg" viewBox="0 0 30 55">
+                                    <path d="M0,52 C14,52 24,42 26,28 C28,16 20,4 6,2 C3,1.5 1,3 1,6 L4,22 C5,27 2,32 1,38 Z" style="fill: var(--s-ear-color)"/>
+                                    <path class="ear-lines" d="M8,8 C16,10 20,18 18,26 C17,30 12,34 8,32" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component s-hair-layer" style="
+                        --s-hair-color: ${PATHS.hairColors[shapes.hairColor]};
+                        --s-hair-scale: ${hS};
+                        fill: var(--s-hair-color);
+                    ">${PATHS.hair[shapes.hairStyle]}</div>
+                    
+                    <div class="s-brows-layer" style="
+                        --s-brows-top: ${bTop}; --s-brows-length: ${bLen}; --s-brows-thickness: ${bThick};
+                        --s-hair-color: ${PATHS.hairColors[shapes.hairColor]};
+                    ">
+                        <div class="s-brow-box left" style="transform: translateX(calc(-1 * ${eyD})) scale(var(--s-brows-length), 1);">
+                            <svg viewBox="0 0 42 15" width="100%" height="100%">
+                                <path d="${PATHS.brows[shapes.browsShape].l}" class="brow-svg" style="stroke: var(--s-hair-color); stroke-width: var(--s-brows-thickness)"/>
+                            </svg>
+                        </div>
+                        <div class="s-brow-box right" style="transform: translateX(${eyD}) scale(var(--s-brows-length), 1);">
+                            <svg viewBox="0 0 42 15" width="100%" height="100%">
+                                <path d="${PATHS.brows[shapes.browsShape].r}" class="brow-svg" style="stroke: var(--s-hair-color); stroke-width: var(--s-brows-thickness)"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="s-eyes-layer" style="
+                        --s-eyes-size: ${eyS}; --s-eyes-dist: ${eyD};
+                        --s-eyes-color: ${PATHS.colors[shapes.eyeColor]};
+                    ">
+                        <div class="s-eye-box left" style="transform: scale(var(--s-eyes-size)) translateX(calc(-1 * var(--s-eyes-dist)));">
+                            <svg viewBox="0 0 40 25" width="100%" height="100%">
+                                <path d="${PATHS.eye[shapes.eyeShape]}" fill="#ffffff" stroke="#334155"/>
+                                <circle cx="20" cy="12" r="7" style="fill: var(--s-eyes-color)"/>
+                                <circle cx="20" cy="12" r="3" fill="#000000"/>
+                            </svg>
+                        </div>
+                        <div class="s-eye-box right" style="transform: scale(var(--s-eyes-size)) translateX(var(--s-eyes-dist));">
+                            <svg viewBox="0 0 40 25" width="100%" height="100%">
+                                <path d="${PATHS.eye[shapes.eyeShape]}" fill="#ffffff" stroke="#334155"/>
+                                <circle cx="20" cy="12" r="7" style="fill: var(--s-eyes-color)"/>
+                                <circle cx="20" cy="12" r="3" fill="#000000"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="component s-nose-layer" style="--s-nose-scale-x: ${nX}; --s-nose-scale-y: ${nY}; transform: translateX(-50%) scale(var(--s-nose-scale-x), var(--s-nose-scale-y));">${PATHS.nose[shapes.noseShape]}</div>
+                    <div class="component s-lips-layer" style="--s-lips-scale-x: ${lX}; --s-lips-scale-y: ${lY}; transform: translateX(-50%) scale(var(--s-lips-scale-x), var(--s-lips-scale-y));">${PATHS.lips[shapes.lipsShape]}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function evaluatePortrait() {
+        let maxScore = 0;
+        let earnedScore = 0;
+
+        let playerSpecs = {};
+        numericalSliders.forEach(s => {
+            let pVal = parseInt(document.getElementById(s.id).value);
+            playerSpecs[s.prop] = pVal;
+
+            let tVal = targetSpecs[s.prop];
+            let el = document.getElementById(s.id);
+            
+            let deltaMax = parseInt(el.max) - parseInt(el.min);
+            if (s.id === 'p-eyesDist') {
+                const eyeRealWidth = 40 * (parseInt(document.getElementById('p-eyesSize').value) / 100);
+                deltaMax = Math.floor((parseInt(document.getElementById('p-faceW').value) / 2) - eyeRealWidth);
+                if (deltaMax <= 0) deltaMax = 1;
+            }
+            
+            let diff = Math.abs(pVal - tVal);
+            earnedScore += Math.max(0, 100 - (diff / deltaMax * 100));
+            maxScore += 100;
+        });
+
+        Object.keys(playerShapes).forEach(k => {
+            earnedScore += (playerShapes[k] === targetSpecs[k]) ? 100 : 0;
+            maxScore += 100;
+        });
+
+        let finalPercent = Math.round((earnedScore / maxScore) * 100);
+        document.getElementById('result-score').innerText = `${finalPercent}%`;
+        
+        let msg = "";
+        if(finalPercent >= 88) msg = "Mémoire d'élite ! Le signalement est d'une fidélité chirurgicale.";
+        else if(finalPercent >= 65) msg = "Bonne observation générale, les patrouilles ont une excellente piste.";
+        else msg = "Trop d'approximations. Le suspect reste difficile à identifier.";
+
+        document.getElementById('result-comment').innerText = msg;
+
+        const targetShapes = {
+            skinTone: targetSpecs.skinTone, faceAge: targetSpecs.faceAge, faceShape: targetSpecs.faceShape, browsShape: targetSpecs.browsShape,
+            eyeColor: targetSpecs.eyeColor, eyeShape: targetSpecs.eyeShape, hairColor: targetSpecs.hairColor,
+            hairStyle: targetSpecs.hairStyle, noseShape: targetSpecs.noseShape, lipsShape: targetSpecs.lipsShape
+        };
+        
+        document.getElementById('final-player-view').innerHTML = buildStaticAvatarHTML('p3', playerSpecs, playerShapes);
+        document.getElementById('final-target-view').innerHTML = buildStaticAvatarHTML('t3', targetSpecs, targetShapes);
+
+        document.getElementById('screen-result').classList.remove('hide');
+        toggleControls(true);
+    }
+
+    function resetGame() {
+        document.getElementById('screen-result').classList.add('hide');
+        document.getElementById('timer-display').innerText = "Prêt pour l'analyse visuelle";
+        document.getElementById('screen-start').classList.remove('hide');
+    }
+</script>
+</body>
+</html>
